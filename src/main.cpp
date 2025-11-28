@@ -7,8 +7,8 @@
 // --- CẤU HÌNH PHẦN CỨNG ---
 #define DHT_PIN 15
 #define DHT_TYPE DHT22
-#define LED_PIN 2
-#define PIR_PIN 13
+#define LED_PIN 26 
+#define PIR_PIN 27
 
 // --- CẤU HÌNH WIFI & SERVER ---
 const char* ssid = "Wokwi-GUEST"; // Mạng ảo của Wokwi
