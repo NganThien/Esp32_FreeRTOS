@@ -4,19 +4,17 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-// --- CẤU HÌNH PHẦN CỨNG ---
 #define DHT_PIN 15
 #define DHT_TYPE DHT22
 #define LED_PIN 26 
 #define PIR_PIN 27
 
-// --- CẤU HÌNH WIFI & SERVER ---
+// Cấu hình WiFi và Server
 const char* ssid = "Wokwi-GUEST"; // Mạng ảo của Wokwi
 const char* password = "";
-const char* serverName = "http://postman-echo.com/post"; // [cite: 8]
+const char* serverName = "http://postman-echo.com/post";
 
-// --- BIẾN TOÀN CỤC (Shared Resources) ---
-// Trong FreeRTOS thực tế nên dùng Queue hoặc Mutex, nhưng với bài lab này dùng biến toàn cục cho đơn giản.
+// Biến toàn cục để lưu dữ liệu cảm biến
 float t = 0.0;
 float h = 0.0;
 int motion = 0;
@@ -24,7 +22,7 @@ int motion = 0;
 DHT dht(DHT_PIN, DHT_TYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-// --- KHAI BÁO PROTOTYPE ---
+// Khai báo các Task
 void TaskBlink(void *pvParameters);
 void TaskSensorRead(void *pvParameters);
 void TaskSendingData(void *pvParameters);
@@ -51,34 +49,32 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   Serial.println("Starting FreeRTOS Tasks...");
-
-  // --- TẠO CÁC TASK ---
   
-  // Task 1: Blink LED (Mức ưu tiên thấp nhất) [cite: 3]
+  // Task 1: Blink LED mỗi 1 giây
   xTaskCreate(
-    TaskBlink,    // Hàm thực thi
-    "Task Blink", // Tên Task
-    1024,         // Stack size (Bytes)
-    NULL,         // Tham số truyền vào
-    1,            // Priority (1 là thấp)
-    NULL          // Task handle
+    TaskBlink,    
+    "Task Blink", 
+    1024,         
+    NULL,         
+    1,            
+    NULL        
   );
 
-  // Task 2: Đọc cảm biến (Mức ưu tiên trung bình) [cite: 4]
+  // Task 2: Đọc cảm biến mỗi 2 giây
   xTaskCreate(
     TaskSensorRead,
     "Task Sensor",
-    4096,         // Cần stack lớn hơn chút cho DHT
+    4096,         
     NULL,
-    2,            // Priority cao hơn LED
+    2,            
     NULL
   );
 
-  // Task 3: Gửi dữ liệu (Mức ưu tiên cao nhất hoặc ngang bằng) [cite: 5]
+  // Task 3: Gửi dữ liệu lên server mỗi 5 giây
   xTaskCreate(
     TaskSendingData,
     "Task HTTP",
-    8192,         // Stack RẤT QUAN TRỌNG: HTTPClient cần nhiều RAM, nếu để thấp sẽ bị crash (Stack Overflow)
+    8192,         
     NULL,
     2,
     NULL
@@ -86,17 +82,14 @@ void setup() {
 }
 
 void loop() {
-  // Trong FreeRTOS, loop() được coi là Idle Task, chúng ta để trống.
   vTaskDelete(NULL);
 }
 
-// --- ĐỊNH NGHĨA CÁC TASK ---
-
 // 1. Task nháy đèn LED mỗi 1 giây
 void TaskBlink(void *pvParameters) {
-  for (;;) { // Vòng lặp vô tận thay cho loop()
+  for (;;) {
     digitalWrite(LED_PIN, HIGH);
-    vTaskDelay(500 / portTICK_PERIOD_MS); // Dùng vTaskDelay thay cho delay()
+    vTaskDelay(500 / portTICK_PERIOD_MS); 
     digitalWrite(LED_PIN, LOW);
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
@@ -123,7 +116,7 @@ void TaskSensorRead(void *pvParameters) {
     lcd.setCursor(0, 1);
     lcd.printf("Motion: %s", motion ? "YES" : "NO ");
 
-    // Log ra Serial (Lưu ý: Serial không an toàn luồng, nhưng tạm chấp nhận ở bài lab)
+    // Log ra Serial Monitor
     Serial.printf("[Sensor] Temp: %.2f, Hum: %.2f, Motion: %d\n", t, h, motion);
 
     vTaskDelay(2000 / portTICK_PERIOD_MS); // Chờ 2s
@@ -144,7 +137,7 @@ void TaskSendingData(void *pvParameters) {
       // Đóng gói JSON
       String httpRequestData = "{\"temperature\":\"" + String(t) + "\",\"humidity\":\"" + String(h) + "\",\"motion\":\"" + String(motion) + "\"}";
 
-      // Gửi POST Request [cite: 6, 8]
+      // Gửi POST Request và nhận phản hồi
       int httpResponseCode = http.POST(httpRequestData);
 
       Serial.print("[HTTP] Sending data: ");
@@ -153,7 +146,7 @@ void TaskSendingData(void *pvParameters) {
       if (httpResponseCode > 0) {
         Serial.printf("[HTTP] Response code: %d\n", httpResponseCode);
         String payload = http.getString();
-        // Serial.println(payload); // In phản hồi từ server nếu cần
+        // Serial.println(payload); 
       } else {
         Serial.printf("[HTTP] Error code: %d\n", httpResponseCode);
       }
